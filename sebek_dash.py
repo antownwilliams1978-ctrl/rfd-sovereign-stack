@@ -1,11 +1,14 @@
+import chromadb
+if hasattr(chromadb.api.client.SharedSystemClient, "clear_system_cache"):
+    chromadb.api.client.SharedSystemClient.clear_system_cache()
 import streamlit as st
 import requests
 import json
 import os
 import subprocess
 try:
-    from langchain_community.embeddings import OllamaEmbeddings
-    from langchain_community.vectorstores import Chroma
+    from langchain_ollama import OllamaEmbeddings
+    from langchain_chroma import Chroma
     HAS_MEMORY = True
 except ImportError:
     HAS_MEMORY = False
@@ -143,3 +146,60 @@ with tab1:
         st.success("Network: SECURE / LOCAL")
         st.write(f"**Files Indexed:** {total_files}")
         st.write(f"**Long-Term Memory:** {memory_status}")
+import streamlit as st
+import json
+import os
+from datetime import datetime
+
+# 1. Define the Memory Vault Path (Ensure this folder exists on your F: drive)
+MEMORY_VAULT = r"F:\AI_VAULT\05_SOVEREIGN_AI_CORE\Session_Ledgers"
+os.makedirs(MEMORY_VAULT, exist_ok=True)
+
+# 2. Add the Sidebar Control Panel for Memory Operations
+st.sidebar.header("🧠 Core Memory & Recall")
+
+# --- ARCHIVE & COMPRESS BUTTON ---
+if st.sidebar.button("💾 Compress & Archive Session"):
+    if "messages" in st.session_state and len(st.session_state.messages) > 1:
+        st.sidebar.info("Compressing session weight...")
+
+        # Gather the raw conversation text
+        raw_chat = " ".join([m["content"] for m in st.session_state.messages])
+
+        # Command the LLM to parse and summarize the chat to save weight
+        summary_prompt = f"Extract the core facts, decisions, and system directives from this conversation into a highly dense summary. Do not include conversational filler. Conversation: {raw_chat}"
+
+        # Call SEBEK to generate the compressed summary
+        compressed_memory = sebek_llm.invoke(summary_prompt).content
+
+        # Save as a lightweight JSON checkpoint
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"{MEMORY_VAULT}\\checkpoint_{timestamp}.json"
+
+        with open(filename, "w") as f:
+            json.dump({"timestamp": timestamp, "compressed_memory": compressed_memory}, f)
+
+        st.sidebar.success(f"Session locked and parsed: checkpoint_{timestamp}.json")
+    else:
+        st.sidebar.warning("No active conversation to compress.")
+
+# --- ESSENTIAL RECALL DROPDOWN ---
+# Find all saved JSON checkpoints in the vault
+saved_checkpoints = [f for f in os.listdir(MEMORY_VAULT) if f.endswith(".json")]
+
+if saved_checkpoints:
+    selected_checkpoint = st.sidebar.selectbox("🔗 Inject Past Correlating Context", ["-- Select Checkpoint --"] + saved_checkpoints)
+
+    if selected_checkpoint != "-- Select Checkpoint --":
+        if st.sidebar.button("Inject Memory Anchor"):
+            # Load the lightweight JSON summary
+            with open(os.path.join(MEMORY_VAULT, selected_checkpoint), "r") as f:
+                data = json.load(f)
+                recalled_memory = data.get("compressed_memory", "")
+
+            # Inject it silently as a System message to guide the LLM without printing it to the user chat
+            if "messages" not in st.session_state:
+                st.session_state.messages = []
+
+            st.session_state.messages.insert(0, {"role": "system", "content": f"BACKGROUND CONTEXT ANCHOR: {recalled_memory}"})
+            st.sidebar.success("Memory Anchor Injected. Drifting Lulled.")
