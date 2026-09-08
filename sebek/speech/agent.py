@@ -45,8 +45,42 @@ try:
     import sounddevice as sd
     import numpy as np
     HAS_AUDIO = True
-except ImportError:
+except (ImportError, OSError):
     HAS_AUDIO = False
+
+
+def resolve_model_path(path_override: Optional[Path] = None) -> tuple[Optional[Path], Optional[str]]:
+    """Resolve and validate the Vosk model directory for startup."""
+    resolved_path = Config.find_vosk_model_path(path_override)
+    if resolved_path is not None:
+        return resolved_path, None
+
+    checked_paths = Config.get_vosk_model_candidates(path_override)
+    checked_display = ", ".join(str(path) for path in checked_paths)
+    guidance = (
+        "Vosk model directory not found. "
+        f"Checked: {checked_display}. "
+        "Set SEBEK_VOSK_MODEL=/path/to/vosk-model, "
+        "pass --model /path/to/vosk-model, "
+        f"or place the model under {Config.speech.vosk_model_path}."
+    )
+    return None, guidance
+
+
+def validate_startup_requirements(path_override: Optional[Path] = None) -> tuple[Optional[Path], list[str]]:
+    """Validate startup prerequisites and return any actionable issues."""
+    issues = []
+    resolved_path, model_error = resolve_model_path(path_override)
+    if model_error:
+        issues.append(model_error)
+
+    if not HAS_AUDIO:
+        issues.append(
+            "Audio capture backend not available. Install the Python `sounddevice` package "
+            "and the system PortAudio libraries."
+        )
+
+    return resolved_path, issues
 
 
 def post_result_to_sebek(
@@ -114,7 +148,10 @@ def recorder_worker(
         device: Audio device index, or None for default.
     """
     if not HAS_AUDIO:
-        logger.error("sounddevice not available - cannot record audio")
+        logger.error(
+            "Audio capture backend not available; install the Python `sounddevice` package "
+            "and the system PortAudio libraries"
+        )
         stop_event.set()
         return
 
@@ -221,7 +258,7 @@ def recognizer_worker(
         stop_event.set()
 
 
-def main() -> int:
+def main(argv: Optional[list[str]] = None) -> int:
     """Main entry point for speech agent.
 
     Returns:
@@ -234,8 +271,8 @@ def main() -> int:
     parser.add_argument(
         "--model",
         type=Path,
-        default=Config.speech.vosk_model_path,
-        help="Path to Vosk model directory",
+        default=None,
+        help="Path to Vosk model directory (overrides SEBEK_VOSK_MODEL)",
     )
     parser.add_argument(
         "--sebek-url",
@@ -267,23 +304,20 @@ def main() -> int:
         help="Logging level",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Setup logging
     setup_root_logger()
 
     try:
         # Validate requirements
-        if not HAS_AUDIO:
-            logger.error("sounddevice not available. Install with: pip install sounddevice")
+        model_path, issues = validate_startup_requirements(args.model)
+        if issues:
+            for issue in issues:
+                logger.error(issue)
             return 1
 
-        if not args.model.exists():
-            logger.error(
-                f"Vosk model not found at {args.model}. "
-                "Download from https://alphacephei.com/vosk/models"
-            )
-            return 1
+        assert model_path is not None
 
         # Initialize TTS
         tts = TextToSpeech(enable=not args.no_tts)
@@ -300,7 +334,7 @@ def main() -> int:
         )
         recognizer = Process(
             target=recognizer_worker,
-            args=(audio_queue, stop_event, args.model, args.sebek_url, args.persist_dir),
+            args=(audio_queue, stop_event, model_path, args.sebek_url, args.persist_dir),
             daemon=True,
         )
 

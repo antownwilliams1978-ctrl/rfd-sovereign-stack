@@ -2,6 +2,24 @@ SEBEK Speech Agent (Vosk) - README
 
 This directory adds a multiprocess speech agent that captures microphone audio, runs offline ASR with Vosk, and posts final transcripts to SEBEK at http://localhost:11434/api/observe
 
+Recommended local startup:
+
+1) Install the repo in editable mode:
+
+   python -m pip install -e .
+
+2) Put a Vosk model in either of these locations:
+
+   - repo-local default: `./models/vosk-model-small-en-us-0.15`
+   - explicit override: any directory you point `SEBEK_VOSK_MODEL` at
+
+3) Launch the package-native entrypoint:
+
+   export SEBEK_VOSK_MODEL="$(pwd)/models/vosk-model-small-en-us-0.15"
+   python -m sebek.speech.agent
+
+If `SEBEK_VOSK_MODEL` is not set, the agent will look for the repo-local `models/vosk-model-small-en-us-0.15` directory first and then fall back to `/opt/vosk-model-small-en-us-0.15`.
+
 Quick install (automated):
 
 1) Clone the repo into /opt and run the setup script as root (the script will create a system user, virtualenv, install requirements, install SEBEK in editable mode, download a Vosk model, set permissions, and install the systemd unit):
@@ -37,10 +55,12 @@ Quick install (automated):
 
 Speech agent launch:
    source /opt/sebek-speech-venv/bin/activate
-   python -m sebek.speech.agent --model /opt/vosk-model-small-en-us-0.15 --persist-dir /var/lib/sebek/speech
+   export SEBEK_VOSK_MODEL=/opt/vosk-model-small-en-us-0.15
+   python -m sebek.speech.agent --persist-dir /var/lib/sebek/speech
 
 Notes & Troubleshooting:
 - The setup script assumes the repository is cloned to /opt/rfd-sovereign-stack. If you cloned elsewhere, adjust paths accordingly.
 - Microphone access: services running as a system user may need audio group membership or ALSA device configuration. If the service cannot access the microphone under systemd, run the agent manually as your user to debug and then adapt the service.
 - SEBEK endpoint: the agent posts JSON payloads to /api/observe. Adjust --sebek-url if your SEBEK engine listens on a different path/port.
+- Missing model guidance: if startup says the Vosk model directory was not found, either export `SEBEK_VOSK_MODEL=/path/to/model` or place the unpacked model in `./models/vosk-model-small-en-us-0.15` before running `python -m sebek.speech.agent`.
 - For improved accuracy, replace the Vosk model with a larger model or switch to a higher-quality ASR backend when you have GPU resources.

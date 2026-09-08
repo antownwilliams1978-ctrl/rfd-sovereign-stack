@@ -3,6 +3,7 @@
 import os
 import pytest
 from pathlib import Path
+import sebek.config as config_module
 from sebek.config import Config, OllamaConfig, VectorDBConfig
 from sebek.utils.errors import ConfigError
 
@@ -69,6 +70,30 @@ class TestSpeechConfig:
     def test_speech_channels_valid(self):
         """Test channels is mono or stereo."""
         assert Config.speech.channels in (1, 2)
+
+    def test_vosk_model_candidates_resolve_relative_override(self, monkeypatch, temp_dir):
+        """Relative override paths should resolve from the current working directory."""
+        monkeypatch.chdir(temp_dir)
+        override = Path("models/custom-vosk")
+
+        candidates = Config.get_vosk_model_candidates(override)
+
+        assert candidates == ((temp_dir / "models/custom-vosk").resolve(),)
+
+    def test_find_vosk_model_path_uses_system_fallback_when_default_missing(self, monkeypatch, temp_dir):
+        """System model path should be checked when no env override is set."""
+        fallback_model = temp_dir / "opt-vosk-model"
+        fallback_model.mkdir()
+
+        original_model_path = Config.speech.vosk_model_path
+        monkeypatch.delenv("SEBEK_VOSK_MODEL", raising=False)
+        monkeypatch.setattr(config_module, "DEFAULT_SYSTEM_VOSK_MODEL_PATH", fallback_model)
+        Config.speech.vosk_model_path = temp_dir / "missing-model"
+
+        try:
+            assert Config.find_vosk_model_path() == fallback_model
+        finally:
+            Config.speech.vosk_model_path = original_model_path
 
 
 class TestEnvironmentVariables:
