@@ -228,11 +228,12 @@ def save_audio_to_wav(
         SpeechError: If file write fails.
     """
     try:
-        with wave.open(str(path), "wb") as wf:
-            wf.setnchannels(channels)
-            wf.setsampwidth(2)  # 16-bit
-            wf.setframerate(sample_rate)
-            wf.writeframes(audio_bytes)
+        with path.open("wb") as audio_file:
+            with wave.open(audio_file, "wb") as wf:
+                wf.setnchannels(channels)
+                wf.setsampwidth(2)  # 16-bit
+                wf.setframerate(sample_rate)
+                wf.writeframes(audio_bytes)
         logger.debug(f"Saved audio to {path}")
     except (IOError, OSError) as e:
         raise SpeechError(f"Failed to save audio to {path}: {e}") from e
