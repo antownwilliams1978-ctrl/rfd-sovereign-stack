@@ -14,7 +14,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements-speech.txt /app/requirements-speech.txt
 RUN pip install --no-cache-dir -r /app/requirements-speech.txt
 
-# copy the agent
-COPY sebek_speech_agent.py /app/sebek_speech_agent.py
+# install package-native SEBEK module
+COPY pyproject.toml setup.py /app/
+COPY sebek /app/sebek
+RUN pip install --no-cache-dir -e /app
 
-ENTRYPOINT ["/usr/bin/env", "python", "/app/sebek_speech_agent.py"]
+ENTRYPOINT ["/usr/bin/env", "python", "-m", "sebek.speech.agent"]

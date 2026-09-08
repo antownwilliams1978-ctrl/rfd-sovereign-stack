@@ -31,7 +31,7 @@ fi
 # 2) Ensure repo is in place (assumes you've pushed/copy repo to ${REPO_DIR})
 if [ ! -d "$REPO_DIR" ]; then
   echo "Please clone this repository to $REPO_DIR before running the script. Exiting."
-  echo "Example: sudo git clone -b add/speech-agent-vosk https://github.com/antownwilliams1978-ctrl/rfd-sovereign-stack.git $REPO_DIR"
+  echo "Example: sudo git clone https://github.com/rfd-core/rfd-sovereign-stack.git $REPO_DIR"
   exit 1
 fi
 
@@ -47,6 +47,7 @@ if [ -f "$REQ_FILE" ]; then
 else
   echo "Requirements file not found at $REQ_FILE; please ensure it's present."
 fi
+pip install -e "$REPO_DIR"
 
 # 4) Download Vosk model if not present
 if [ ! -d "$MODEL_DIR" ]; then
@@ -86,4 +87,4 @@ systemctl start sebek-speech
 # 9) Print status
 systemctl status sebek-speech --no-pager || true
 
-echo "Setup complete. If the service failed to start, check journalctl -u sebek-speech -f and $REPO_DIR/sebek_speech.log"
+echo "Setup complete. If the service failed to start, check journalctl -u sebek-speech -f"

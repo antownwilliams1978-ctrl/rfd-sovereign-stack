@@ -23,7 +23,7 @@ services:
     #   - /var/lib/sebek/speech:/data
     # devices:
     #   - /dev/snd:/dev/snd
-    entrypoint: ["/usr/bin/env", "python", "/app/sebek_speech_agent.py", "--model", "/models", "--persist-dir", "/data", "--sebek-url", "http://sebek-mock:11434/api/observe"]
+    entrypoint: ["/usr/bin/env", "python", "-m", "sebek.speech.agent", "--model", "/models", "--persist-dir", "/data", "--sebek-url", "http://sebek-mock:11434/api/observe"]
 
 volumes:
   sebek-mock-data:

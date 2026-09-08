@@ -4,9 +4,9 @@ This directory adds a multiprocess speech agent that captures microphone audio, 
 
 Quick install (automated):
 
-1) Clone the branch into /opt and run the setup script as root (the script will create a system user, virtualenv, install requirements, download a Vosk model, set permissions, and install the systemd unit):
+1) Clone the repo into /opt and run the setup script as root (the script will create a system user, virtualenv, install requirements, install SEBEK in editable mode, download a Vosk model, set permissions, and install the systemd unit):
 
-   sudo git clone -b add/speech-agent-vosk https://github.com/antownwilliams1978-ctrl/rfd-sovereign-stack.git /opt/rfd-sovereign-stack
+   sudo git clone https://github.com/rfd-core/rfd-sovereign-stack.git /opt/rfd-sovereign-stack
    sudo /opt/rfd-sovereign-stack/setup/sebek_setup.sh
 
 2) Manual steps (if you prefer to run manually):
@@ -35,12 +35,12 @@ Quick install (automated):
    sudo systemctl enable sebek-speech
    sudo systemctl start sebek-speech
 
-Simulator mode (replay a WAV file):
+Speech agent launch:
    source /opt/sebek-speech-venv/bin/activate
-   python /opt/rfd-sovereign-stack/sebek_speech_agent.py --sim-file /path/to/test.wav --model /opt/vosk-model-small-en-us-0.15
+   python -m sebek.speech.agent --model /opt/vosk-model-small-en-us-0.15 --persist-dir /var/lib/sebek/speech
 
 Notes & Troubleshooting:
-- The setup script assumes the repository branch add/speech-agent-vosk is cloned to /opt/rfd-sovereign-stack. If you cloned elsewhere, adjust paths accordingly.
+- The setup script assumes the repository is cloned to /opt/rfd-sovereign-stack. If you cloned elsewhere, adjust paths accordingly.
 - Microphone access: services running as a system user may need audio group membership or ALSA device configuration. If the service cannot access the microphone under systemd, run the agent manually as your user to debug and then adapt the service.
 - SEBEK endpoint: the agent posts JSON payloads to /api/observe. Adjust --sebek-url if your SEBEK engine listens on a different path/port.
 - For improved accuracy, replace the Vosk model with a larger model or switch to a higher-quality ASR backend when you have GPU resources.
