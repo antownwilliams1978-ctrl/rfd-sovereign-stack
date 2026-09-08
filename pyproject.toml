@@ -64,6 +64,7 @@ Issues = "https://github.com/rfd-core/rfd-sovereign-stack/issues"
 
 [project.scripts]
 sebek-ingestion = "sebek.ingestion_cli:main"
+sebek-mass-digest = "sebek.ingestion_cli:main"
 sebek-speech-agent = "sebek.speech.agent:main"
 
 [tool.setuptools]

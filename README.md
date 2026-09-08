@@ -8,7 +8,7 @@ A sovereign, portable, and cost-effective e-commerce platform for the Red Feathe
   - Dashboard: `sebek/dashboard.py`
   - Ingestion CLI: `sebek/ingestion_cli.py`
   - Speech agent: `sebek/speech/agent.py`
-- Root-level `sebek_dash.py` and `sebek_speech_agent.py` are compatibility wrappers (deprecated).
+- Root-level `sebek_dash.py`, `sebek_speech_agent.py`, and `sebek_mass_digest.py` are compatibility wrappers (deprecated).
 
 ## Run SEBEK locally
 

@@ -1,16 +1,27 @@
 """Tests for package-native and compatibility entrypoints."""
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+import importlib
+import sys
+import types
 
 
 def test_legacy_dash_wrapper_calls_package_main():
     """Legacy sebek_dash.py should delegate to sebek.dashboard.main."""
-    import sebek_dash
-
-    with patch("sebek_dash.dashboard_main") as mock_main:
+    fake_dashboard = types.ModuleType("sebek.dashboard")
+    fake_dashboard.main = Mock()
+    original = sys.modules.get("sebek.dashboard")
+    try:
+        sys.modules["sebek.dashboard"] = fake_dashboard
+        sebek_dash = importlib.import_module("sebek_dash")
         sebek_dash.main()
-        mock_main.assert_called_once()
+        fake_dashboard.main.assert_called_once()
+    finally:
+        if original is not None:
+            sys.modules["sebek.dashboard"] = original
+        else:
+            sys.modules.pop("sebek.dashboard", None)
 
 
 def test_legacy_speech_wrapper_calls_package_main():
@@ -19,6 +30,16 @@ def test_legacy_speech_wrapper_calls_package_main():
 
     with patch("sebek_speech_agent.speech_main", return_value=0) as mock_main:
         rc = sebek_speech_agent.main()
+        assert rc == 0
+        mock_main.assert_called_once()
+
+
+def test_legacy_mass_digest_wrapper_calls_package_main():
+    """Legacy sebek_mass_digest.py should delegate to sebek.ingestion_cli.main."""
+    import sebek_mass_digest
+
+    with patch("sebek_mass_digest.ingestion_main", return_value=0) as mock_main:
+        rc = sebek_mass_digest.main()
         assert rc == 0
         mock_main.assert_called_once()
 
