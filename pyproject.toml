@@ -62,8 +62,15 @@ Documentation = "https://github.com/rfd-core/rfd-sovereign-stack/docs"
 Repository = "https://github.com/rfd-core/rfd-sovereign-stack.git"
 Issues = "https://github.com/rfd-core/rfd-sovereign-stack/issues"
 
+[project.scripts]
+sebek-ingestion = "sebek.ingestion_cli:main"
+sebek-speech-agent = "sebek.speech.agent:main"
+
 [tool.setuptools]
-packages = ["sebek"]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["sebek*"]
 
 [tool.black]
 line-length = 100

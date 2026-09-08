@@ -7,7 +7,8 @@ Provides a web interface for:
 - Direct command interface to SEBEK core
 
 Usage:
-    streamlit run -m sebek.dashboard
+    streamlit run sebek/dashboard.py
+    python -m sebek.dashboard
 """
 
 import json
@@ -32,6 +33,7 @@ try:
     from langchain_community.vectorstores import Chroma
     HAS_MEMORY = True
 except ImportError:
+    Chroma = Any
     HAS_MEMORY = False
     logger.warning("LangChain/Chroma not available - memory features disabled")
 

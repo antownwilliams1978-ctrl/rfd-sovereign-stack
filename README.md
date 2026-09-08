@@ -2,10 +2,34 @@
 
 A sovereign, portable, and cost-effective e-commerce platform for the Red Feather Dynasty, built on a Vultr-ready headless architecture. · Built with Manus.
 
-## Current Architecture & Files
-- **Language:** Python
-- **Core Components:**
-  - `sebek_dash.py`: Dashboard and interface for the SEBEK Neural Engine Core.
-  - `sebek_mass_digest.py`: Data processing and vector domain tools.
-  - `Modelfile`: DSOS Infrastructure Baseline configuration.
-  - `operations_ledger.txt` & `sebek_audit.txt`: Infrastructure logs and audits.
+## SEBEK package-native layout
+
+- Primary package: `sebek/`
+  - Dashboard: `sebek/dashboard.py`
+  - Ingestion CLI: `sebek/ingestion_cli.py`
+  - Speech agent: `sebek/speech/agent.py`
+- Root-level `sebek_dash.py` and `sebek_speech_agent.py` are compatibility wrappers (deprecated).
+
+## Run SEBEK locally
+
+```bash
+pip install -e .
+```
+
+### Dashboard (Streamlit)
+
+```bash
+streamlit run sebek/dashboard.py
+```
+
+### Speech agent
+
+```bash
+python -m sebek.speech.agent
+```
+
+### Ingestion
+
+```bash
+python -m sebek.ingestion_cli
+```
