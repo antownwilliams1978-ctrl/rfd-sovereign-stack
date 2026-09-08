@@ -24,6 +24,7 @@ from typing import Optional
 import requests
 
 from sebek.config import Config
+from sebek.services.speech_service import write_agent_status
 from sebek.utils.logging import get_logger, setup_root_logger
 from sebek.utils.errors import SpeechError
 from sebek.speech.recognizer import (
@@ -45,7 +46,7 @@ try:
     import sounddevice as sd
     import numpy as np
     HAS_AUDIO = True
-except ImportError:
+except Exception:
     HAS_AUDIO = False
 
 
@@ -54,6 +55,7 @@ def post_result_to_sebek(
     url: Optional[str] = None,
     max_retries: int = 3,
     backoff: float = 1.0,
+    status_file: Optional[Path] = None,
 ) -> Optional[requests.Response]:
     """Post speech recognition result to SEBEK API.
 
@@ -86,6 +88,14 @@ def post_result_to_sebek(
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=5)
             logger.info(f"Posted to SEBEK: {response.status_code}")
+            write_agent_status(
+                status_file=status_file,
+                status="running",
+                running=True,
+                last_transcript=result.text,
+                last_observation_source=payload["source"],
+                last_error=None,
+            )
             return response
         except requests.exceptions.RequestException as e:
             if attempt < max_retries:
@@ -97,6 +107,12 @@ def post_result_to_sebek(
                 time.sleep(wait_time)
             else:
                 logger.error(f"Failed to post to SEBEK after {max_retries} attempts: {e}")
+                write_agent_status(
+                    status_file=status_file,
+                    status="error",
+                    running=True,
+                    last_error=str(e),
+                )
 
     return None
 
@@ -105,6 +121,7 @@ def recorder_worker(
     audio_queue: Queue,
     stop_event: Event,
     device: Optional[int] = None,
+    status_file: Optional[Path] = None,
 ) -> None:
     """Worker process: capture microphone audio and queue it.
 
@@ -115,6 +132,12 @@ def recorder_worker(
     """
     if not HAS_AUDIO:
         logger.error("sounddevice not available - cannot record audio")
+        write_agent_status(
+            status_file=status_file,
+            status="error",
+            running=False,
+            last_error="sounddevice not available - cannot record audio",
+        )
         stop_event.set()
         return
 
@@ -139,6 +162,12 @@ def recorder_worker(
 
     except Exception as e:
         logger.exception(f"Recorder error: {e}")
+        write_agent_status(
+            status_file=status_file,
+            status="error",
+            running=False,
+            last_error=f"Recorder error: {e}",
+        )
         stop_event.set()
 
 
@@ -148,6 +177,7 @@ def recognizer_worker(
     model_path: Path,
     sebek_url: Optional[str] = None,
     persist_dir: Optional[Path] = None,
+    status_file: Optional[Path] = None,
 ) -> None:
     """Worker process: recognize speech and post results.
 
@@ -202,7 +232,7 @@ def recognizer_worker(
                             logger.warning(f"Failed to save audio: {e}")
 
                         # Post to SEBEK
-                        post_result_to_sebek(result, sebek_url)
+                        post_result_to_sebek(result, sebek_url, status_file=status_file)
 
                     # Reset for next utterance
                     bytes_buffer = bytearray()
@@ -210,14 +240,32 @@ def recognizer_worker(
 
                 except SpeechError as e:
                     logger.error(f"Speech recognition error: {e}")
+                    write_agent_status(
+                        status_file=status_file,
+                        status="error",
+                        running=True,
+                        last_error=f"Speech recognition error: {e}",
+                    )
                     bytes_buffer = bytearray()
                     recognizer.reset()
 
     except SpeechError as e:
         logger.error(f"Recognizer initialization failed: {e}")
+        write_agent_status(
+            status_file=status_file,
+            status="error",
+            running=False,
+            last_error=f"Recognizer initialization failed: {e}",
+        )
         stop_event.set()
     except Exception as e:
         logger.exception(f"Recognizer worker error: {e}")
+        write_agent_status(
+            status_file=status_file,
+            status="error",
+            running=False,
+            last_error=f"Recognizer worker error: {e}",
+        )
         stop_event.set()
 
 
@@ -266,6 +314,12 @@ def main() -> int:
         default="INFO",
         help="Logging level",
     )
+    parser.add_argument(
+        "--status-file",
+        type=Path,
+        default=None,
+        help="Path to dashboard-readable speech status file",
+    )
 
     args = parser.parse_args()
 
@@ -273,15 +327,35 @@ def main() -> int:
     setup_root_logger()
 
     try:
+        status_file = args.status_file or (args.persist_dir / "speech_agent_status.json")
+        write_agent_status(
+            status_file=status_file,
+            status="starting",
+            running=False,
+            pid=os.getpid(),
+        )
+
         # Validate requirements
         if not HAS_AUDIO:
             logger.error("sounddevice not available. Install with: pip install sounddevice")
+            write_agent_status(
+                status_file=status_file,
+                status="error",
+                running=False,
+                last_error="sounddevice not available. Install with: pip install sounddevice",
+            )
             return 1
 
         if not args.model.exists():
             logger.error(
                 f"Vosk model not found at {args.model}. "
                 "Download from https://alphacephei.com/vosk/models"
+            )
+            write_agent_status(
+                status_file=status_file,
+                status="error",
+                running=False,
+                last_error=f"Vosk model not found at {args.model}",
             )
             return 1
 
@@ -295,16 +369,23 @@ def main() -> int:
         # Start worker processes
         recorder = Process(
             target=recorder_worker,
-            args=(audio_queue, stop_event, args.device),
+            args=(audio_queue, stop_event, args.device, status_file),
             daemon=True,
         )
         recognizer = Process(
             target=recognizer_worker,
-            args=(audio_queue, stop_event, args.model, args.sebek_url, args.persist_dir),
+            args=(audio_queue, stop_event, args.model, args.sebek_url, args.persist_dir, status_file),
             daemon=True,
         )
 
         logger.info("Starting SEBEK speech agent")
+        write_agent_status(
+            status_file=status_file,
+            status="running",
+            running=True,
+            pid=os.getpid(),
+            last_error=None,
+        )
         recorder.start()
         recognizer.start()
 
@@ -318,9 +399,22 @@ def main() -> int:
                 time.sleep(1)
                 if not recorder.is_alive() or not recognizer.is_alive():
                     logger.warning("Worker process died; shutting down")
+                    write_agent_status(
+                        status_file=status_file,
+                        status="error",
+                        running=False,
+                        pid=os.getpid(),
+                        last_error="Worker process died; shutting down",
+                    )
                     break
         except KeyboardInterrupt:
             logger.info("Shutdown signal received")
+            write_agent_status(
+                status_file=status_file,
+                status="stopping",
+                running=False,
+                pid=os.getpid(),
+            )
 
         # Cleanup
         stop_event.set()
@@ -333,10 +427,23 @@ def main() -> int:
                     proc.kill()
 
         logger.info("SEBEK speech agent stopped")
+        write_agent_status(
+            status_file=status_file,
+            status="stopped",
+            running=False,
+            pid=None,
+        )
         return 0
 
     except Exception as e:
         logger.exception(f"Fatal error: {e}")
+        write_agent_status(
+            status_file=args.status_file if "args" in locals() else None,
+            status="error",
+            running=False,
+            pid=None,
+            last_error=f"Fatal error: {e}",
+        )
         return 1
 
 

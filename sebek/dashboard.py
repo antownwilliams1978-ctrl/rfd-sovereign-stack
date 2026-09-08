@@ -20,6 +20,7 @@ import streamlit as st
 import requests
 
 from sebek.config import Config
+from sebek.services.speech_service import get_agent_status, start_agent, stop_agent
 from sebek.utils.logging import get_logger, setup_root_logger
 from sebek.utils.vectordb import initialize_vector_db, safe_similarity_search
 from sebek.utils.errors import OllamaError, VectorDBError
@@ -155,7 +156,8 @@ def query_sebek(prompt: str, retrieved_context: str = "") -> str:
 
 def render_system_status() -> None:
     """Render system status indicators."""
-    col1, col2, col3, col4 = st.columns(4)
+    speech_status = get_agent_status()
+    col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
         st.metric(
@@ -186,6 +188,66 @@ def render_system_status() -> None:
             label="🧠 Long-Term Memory",
             value=memory_status,
         )
+
+    with col5:
+        st.metric(
+            label="🎙️ Speech Agent",
+            value="RUNNING" if speech_status["running"] else "STOPPED",
+            delta=f"PID {speech_status['pid']}" if speech_status.get("pid") else "Ready",
+        )
+
+
+def render_speech_agent_panel() -> None:
+    """Render speech-agent controls and persisted status."""
+    st.subheader("🎙️ Speech Agent")
+    st.write("Start or stop the package-native speech agent as a separate background process.")
+
+    status = get_agent_status()
+
+    action_col1, action_col2, action_col3 = st.columns(3)
+    with action_col1:
+        if st.button("Start Speech Agent", use_container_width=True, disabled=status["running"]):
+            status = start_agent(enable_tts=Config.speech.enable_tts)
+            if status["running"]:
+                st.success("Speech agent started.")
+            else:
+                st.error(status.get("last_error") or "Speech agent failed to start.")
+    with action_col2:
+        if st.button("Stop Speech Agent", use_container_width=True, disabled=not status["running"]):
+            status = stop_agent()
+            st.info("Speech agent stopped.")
+    with action_col3:
+        if st.button("Refresh Status", use_container_width=True):
+            st.rerun()
+
+    status = get_agent_status()
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Status", status["status"].upper())
+    with col2:
+        st.metric("PID", status["pid"] or "—")
+    with col3:
+        st.metric("Observation Source", status.get("last_observation_source") or "—")
+    with col4:
+        st.metric("Model Path", str(Config.speech.vosk_model_path))
+
+    st.caption(
+        f"Runtime dir: {Config.speech.persist_dir} | "
+        "Launches `python -m sebek.speech.agent` and persists state on disk for reruns."
+    )
+
+    last_transcript = status.get("last_transcript")
+    if last_transcript:
+        st.text_area("Last Transcript", value=last_transcript, height=120, disabled=True)
+    else:
+        st.info("No transcript captured yet.")
+
+    if status.get("last_error"):
+        st.error(status["last_error"])
+    elif status["running"]:
+        st.success("Speech agent is running.")
+    else:
+        st.warning("Speech agent is not running.")
 
 
 def render_comms_link() -> None:
@@ -312,13 +374,16 @@ def main() -> None:
     st.markdown("### Digital Sovereign Operating System (DSOS) - Control Interface")
 
     # Tabs
-    tab1, tab2 = st.tabs(["💬 Comms Link", "🗄️ Vault Explorer"])
+    tab1, tab2, tab3 = st.tabs(["💬 Comms Link", "🗄️ Vault Explorer", "🎙️ Speech Agent"])
 
     with tab1:
         render_comms_link()
 
     with tab2:
         render_vault_explorer()
+
+    with tab3:
+        render_speech_agent_panel()
 
     # Footer
     st.divider()
