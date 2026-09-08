@@ -39,6 +39,14 @@ Speech agent launch:
    source /opt/sebek-speech-venv/bin/activate
    python -m sebek.speech.agent --model /opt/vosk-model-small-en-us-0.15 --persist-dir /var/lib/sebek/speech
 
+Dashboard integration:
+- When the Streamlit dashboard is running, open the **Speech Agent** tab to start, stop,
+  and inspect the package-native speech agent from the UI.
+- The dashboard keeps agent state in the speech persist directory so Streamlit reruns can
+  still show running/stopped status, PID, last transcript, and the last reported error.
+- Do not use dashboard controls and a systemd-managed `sebek-speech` service for the same
+  local runtime at the same time, or you may end up with competing speech-agent processes.
+
 Notes & Troubleshooting:
 - The setup script assumes the repository is cloned to /opt/rfd-sovereign-stack. If you cloned elsewhere, adjust paths accordingly.
 - Microphone access: services running as a system user may need audio group membership or ALSA device configuration. If the service cannot access the microphone under systemd, run the agent manually as your user to debug and then adapt the service.

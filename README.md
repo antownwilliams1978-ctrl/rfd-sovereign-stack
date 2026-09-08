@@ -22,11 +22,17 @@ pip install -e .
 streamlit run sebek/dashboard.py
 ```
 
+The dashboard now includes a **Speech Agent** tab that starts/stops the package-native
+`python -m sebek.speech.agent` process and shows persisted runtime status.
+
 ### Speech agent
 
 ```bash
 python -m sebek.speech.agent
 ```
+
+If you use the dashboard controls, let the dashboard manage the speech agent instead of
+starting a second copy manually or through systemd at the same time.
 
 ### Ingestion
 
