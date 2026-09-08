@@ -88,3 +88,7 @@ systemctl start sebek-speech
 systemctl status sebek-speech --no-pager || true
 
 echo "Setup complete. If the service failed to start, check journalctl -u sebek-speech -f"
+echo "Manual package-native launch:"
+echo "  source $VENV_DIR/bin/activate"
+echo "  export SEBEK_VOSK_MODEL=$MODEL_DIR"
+echo "  python -m sebek.speech.agent --persist-dir $PERSIST_DIR"

@@ -25,6 +25,7 @@ streamlit run sebek/dashboard.py
 ### Speech agent
 
 ```bash
+export SEBEK_VOSK_MODEL="$(pwd)/models/vosk-model-small-en-us-0.15"
 python -m sebek.speech.agent
 ```
 

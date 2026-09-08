@@ -16,6 +16,19 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_VOSK_MODEL_NAME = "vosk-model-small-en-us-0.15"
+DEFAULT_LOCAL_VOSK_MODEL_PATH = REPO_ROOT / "models" / DEFAULT_VOSK_MODEL_NAME
+DEFAULT_SYSTEM_VOSK_MODEL_PATH = Path("/opt") / DEFAULT_VOSK_MODEL_NAME
+
+
+def _normalize_path(path_value: Path | str) -> Path:
+    """Normalize configured paths for stable local and service startup."""
+    path = Path(path_value).expanduser()
+    if not path.is_absolute():
+        path = (Path.cwd() / path).resolve(strict=False)
+    return path
+
 
 @dataclass
 class OllamaConfig:
@@ -167,7 +180,9 @@ class Config:
 
     # Speech configuration
     speech = SpeechConfig(
-        vosk_model_path=Path(os.getenv("SEBEK_VOSK_MODEL", "./models/vosk-model-small-en-us-0.15")),
+        vosk_model_path=_normalize_path(
+            os.getenv("SEBEK_VOSK_MODEL", str(DEFAULT_LOCAL_VOSK_MODEL_PATH))
+        ),
         persist_dir=Path(os.getenv("SEBEK_SPEECH_PERSIST_DIR", "./sebek_speech_data")),
         sample_rate=int(os.getenv("SEBEK_SAMPLE_RATE", "16000")),
         channels=int(os.getenv("SEBEK_CHANNELS", "1")),
@@ -184,6 +199,36 @@ class Config:
         log_dir=Path(os.getenv("SEBEK_LOG_DIR", "./logs")),
         enable_file_logging=os.getenv("SEBEK_LOG_FILE", "true").lower() == "true",
     )
+
+    @classmethod
+    def get_vosk_model_candidates(cls, path_override: Optional[Path] = None) -> tuple[Path, ...]:
+        """Return the ordered set of Vosk model directories to try."""
+        if path_override is not None:
+            return (_normalize_path(path_override),)
+
+        configured_path = _normalize_path(cls.speech.vosk_model_path)
+        candidates = [configured_path]
+
+        if "SEBEK_VOSK_MODEL" not in os.environ and configured_path != DEFAULT_SYSTEM_VOSK_MODEL_PATH:
+            candidates.append(DEFAULT_SYSTEM_VOSK_MODEL_PATH)
+
+        seen = set()
+        ordered_candidates = []
+        for candidate in candidates:
+            candidate_str = str(candidate)
+            if candidate_str not in seen:
+                seen.add(candidate_str)
+                ordered_candidates.append(candidate)
+
+        return tuple(ordered_candidates)
+
+    @classmethod
+    def find_vosk_model_path(cls, path_override: Optional[Path] = None) -> Optional[Path]:
+        """Find the first existing Vosk model directory."""
+        for candidate in cls.get_vosk_model_candidates(path_override):
+            if candidate.is_dir():
+                return candidate
+        return None
 
     @classmethod
     def validate(cls) -> bool:
@@ -206,8 +251,11 @@ class Config:
             logger.warning(f"Vault path does not exist: {cls.vault.vault_path}")
 
         # Warn about Vosk model
-        if not cls.speech.vosk_model_path.exists():
-            logger.warning(f"Vosk model not found at: {cls.speech.vosk_model_path}")
+        if not cls.find_vosk_model_path():
+            logger.warning(
+                "Vosk model not found. Checked: %s",
+                ", ".join(str(path) for path in cls.get_vosk_model_candidates()),
+            )
 
         if issues:
             raise ValueError("\n".join(issues))

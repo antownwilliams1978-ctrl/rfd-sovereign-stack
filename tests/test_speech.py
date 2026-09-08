@@ -10,6 +10,7 @@ from sebek.speech.recognizer import (
     save_audio_to_wav,
     SpeechRecognitionResult,
 )
+from sebek.speech import agent as speech_agent
 from sebek.utils.errors import SpeechError
 
 
@@ -165,3 +166,29 @@ class TestSaveAudioToWav:
 
         with pytest.raises(SpeechError):
             save_audio_to_wav(invalid_path, audio_bytes)
+
+
+class TestSpeechAgentStartup:
+    """Test speech agent startup validation helpers."""
+
+    def test_validate_startup_requirements_reports_missing_model_guidance(self, monkeypatch, temp_dir):
+        """Missing models should produce actionable configuration guidance."""
+        missing_model = temp_dir / "missing-model"
+        monkeypatch.setattr(speech_agent, "HAS_AUDIO", True)
+
+        resolved_path, issues = speech_agent.validate_startup_requirements(missing_model)
+
+        assert resolved_path is None
+        assert len(issues) == 1
+        assert "SEBEK_VOSK_MODEL" in issues[0]
+        assert "--model" in issues[0]
+        assert str(missing_model) in issues[0]
+
+    def test_main_returns_error_for_missing_model(self, monkeypatch, temp_dir):
+        """Main should fail cleanly when the requested model directory is missing."""
+        monkeypatch.setattr(speech_agent, "HAS_AUDIO", True)
+        monkeypatch.setattr(speech_agent, "setup_root_logger", Mock())
+
+        rc = speech_agent.main(["--model", str(temp_dir / "missing-model"), "--no-tts"])
+
+        assert rc == 1

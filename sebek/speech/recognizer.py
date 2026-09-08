@@ -76,9 +76,11 @@ class VoskRecognizer:
         if not HAS_VOSK:
             raise SpeechError("Vosk is not installed")
 
-        self.model_path = model_path or Config.speech.vosk_model_path
+        self.model_path = Config.find_vosk_model_path(model_path) or Config.get_vosk_model_candidates(
+            model_path
+        )[0]
 
-        if not self.model_path.exists():
+        if not self.model_path.is_dir():
             raise SpeechError(f"Vosk model not found at: {self.model_path}")
 
         try:
