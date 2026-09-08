@@ -8,10 +8,9 @@ Deprecated: use package-native launch paths:
 
 from warnings import warn
 
-from sebek.dashboard import main as dashboard_main
-
-
 def main() -> None:
+    from sebek.dashboard import main as dashboard_main
+
     warn(
         "sebek_dash.py is deprecated; use `streamlit run sebek/dashboard.py` "
         "or `python -m sebek.dashboard`.",

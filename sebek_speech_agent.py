@@ -7,10 +7,9 @@ Deprecated: use package-native launch path:
 
 from warnings import warn
 
-from sebek.speech.agent import main as speech_main
-
-
 def main() -> int:
+    from sebek.speech.agent import main as speech_main
+
     warn(
         "sebek_speech_agent.py is deprecated; use `python -m sebek.speech.agent`.",
         DeprecationWarning,

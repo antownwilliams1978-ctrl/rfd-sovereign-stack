@@ -8,10 +8,9 @@ Deprecated: use package-native launch paths:
 
 from warnings import warn
 
-from sebek.ingestion_cli import main as ingestion_main
-
-
 def main() -> int:
+    from sebek.ingestion_cli import main as ingestion_main
+
     warn(
         "sebek_mass_digest.py is deprecated; use `python -m sebek.ingestion_cli` "
         "or `sebek-ingestion`.",
